@@ -1,0 +1,15 @@
+language: python
+python:
+  - "2.7"
+virtualenv:
+  system_site_packages: true
+before_install:
+  - sudo apt-get update
+  - sudo xargs -a apt-packages.txt apt-get install --fix-missing
+install:
+  - pip install -r base-requirements.txt
+before_script:
+  - python manage.py syncdb --settings=discern.settings --pythonpath=. --noinput
+  - python manage.py migrate --settings=discern.settings --pythonpath=. --noinput
+  - python manage.py collectstatic -c --noinput --settings=discern.settings --pythonpath=.
+script:  python manage.py test --settings=discern.test_settings --pythonpath=. --noinput

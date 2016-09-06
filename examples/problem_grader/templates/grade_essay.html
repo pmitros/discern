@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% load compressed %}
+
+{% block additional_js %}
+    {% compressed_js 'essaygrade' %}
+{% endblock %}
+
+{% block content %}
+    <h4 xmlns="http://www.w3.org/1999/html">Grade Essays</h4>
+    <div id="model_name" model={{ model }} url= {{ api_url }}></div>
+    <div class="container-fluid">
+        <div class="row-fluid">
+            <div id="course_nav" class="span2 pull-left"></div>
+            <div id="problem_nav" class="span2"></div>
+            <div id="essay-container" class="span8"></div>
+        </div>
+    </div>
+
+    {%  verbatim %}
+        <script type="text/template" id="course-nav-template">
+            <ul class="nav nav-list">
+                <li class="nav-header">Course</li>
+                <% _.each( courses, function( course ){ %>
+                <li data-course_id="<%= course.id %>"><a href="#" class="course-select"><%= course.course_name %></a></li>
+                <% }); %>
+            </ul>
+        </script>
+        <script type="text/template" id="problem-nav-template">
+            <ul class="nav nav-list">
+                <li class="nav-header">Problem</li>
+                <% _.each( problems, function( problem ){ %>
+                <li data-prompt="<%= problem.prompt %>" data-problem_id="<%= problem.id %>" data-course_id="<%= course_id %>" data-name="<%= problem.name %>"><a href="#" class="problem-select"><%= problem.name %></a></li>
+                <% }); %>
+            </ul>
+        </script>
+        <script type="text/template" id="essay-item-template">
+            <div class="accordion-group">
+                <div class="accordion-heading">
+                    <a class="accordion-toggle collapsed" data-toggle="collapse" data-parent="#accordion2" href="#<%= href %>" data-elem_id="<%= id %>">
+                        <%= name %> <i class=" icon-remove delete-essay pull-right"></i>
+                    </a>
+                </div>
+                <div id="<%= href %>" class="accordion-body collapse" style="height: 0px;">
+                    <div class="accordion-inner">
+                        <ul class="unstyled">
+                            <li>Created on: <%= created %></li>
+                            <li>Last modified on: <%= modified %></li>
+                        </ul>
+                        <h5>Prompt</h5>
+                        <p><%= prompt %></p>
+
+                        <h5>Essay Text</h5>
+                        <p></p><%= essay_text %></p>
+
+                        <a href="#" class="grade-essay btn">Grade the essay</a>
+                        <div class="grading-container">
+                            <h5>Rubric</h5>
+                            <form onsubmit="return false;">
+                                <%= rubric %>
+                                <textarea type="text" rows="3" class="essay-feedback" placeholder="Enter feedback"></textarea>
+                                <button type="submit" class="create-essaygrade" class="btn">Submit Grades</button>
+                            </form>
+                        </div>
+
+                        <h5>Existing Grades</h5>
+                        <%= essaygrades %>
+                    </div>
+                </div>
+            </div>
+        </script>
+        <script type="text/template" id="essay-list-template">
+            <div class="accordion" id="accordion2">
+                <% _.each( essays, function( essay ){ %>
+                <%= essay %>
+                <% }); %>
+            </div>
+        </script>
+        <script type="text/template" id="rubric-list-template">
+            <div id="rubric-list">
+                <table class="table table-condensed">
+                    <tr>
+                        <th>
+                            Rubric Text
+                        </th>
+                        <th>
+                            Points
+                        </th>
+                        <th>
+                            Select
+                        </th>
+                    </tr>
+                    <% _.each( rubrics, function( rubric ){ %>
+                    <tr>
+                        <td><%= rubric.option_text %></td>
+                        <td><%= rubric.option_points %></td>
+                        <td><input type="checkbox" class="rubric-item-select"></td>
+                    </tr>
+                    <% }); %>
+                </table>
+            </div>
+        </script>
+        <script type="text/template" id="essay-grade-tab-template">
+            <li><a href="#<%= href %>" data-toggle="tab"><%= type %></a></li>
+        </script>
+        <script type="text/template" id="essay-grade-detail-template">
+            <div class="tab-pane" id="<%= href %>">
+                <table class="table table-condensed">
+                    <tr>
+                        <th>
+                            Rubric Text
+                        </th>
+                        <th>
+                            Points
+                        </th>
+                    </tr>
+                    <% _.each( rubrics, function( rubric ){ %>
+                        <% if(rubric.selected) { %>
+                            <tr class="success">
+                        <% } else { %>
+                            <tr class="error">
+                        <% }; %>
+                                <td><%= rubric.option_text %></td>
+                                <td><%= rubric.option_points %></td>
+                            </tr>
+                    <% }); %>
+                </table>
+            </div>
+        </script>
+        <script type="text/template" id="essay-grades-template">
+            <div id="essaygrade-list">
+                <div class="tabbable" style="margin-bottom: 18px;">
+                    <ul class="nav nav-tabs">
+                        <% _.each( tabs, function( tab ){ %>
+                            <%= tab %>
+                        <% }); %>
+                    </ul>
+                    <div class="tab-content">
+                        <% _.each( details, function( detail ){ %>
+                            <%= detail %>
+                        <% }); %>
+                    </div>
+                </div>
+            </div>
+        </script>
+    {%  endverbatim %}
+{% endblock %}

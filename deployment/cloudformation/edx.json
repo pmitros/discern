@@ -1,0 +1,2470 @@
+{
+    "AWSTemplateFormatVersion":"2010-09-09",
+    "Description":"Bring up the edX Discern stack in a VPC.",
+    "Parameters":{
+        "EnvironmentTag":{
+            "Type":"String",
+            "Description":"A tag value applied to the hosts in the VPC indicating which environment to use during the configuration phase, e.g., development, stage, production",
+            "Default":"stage"
+        },
+        "KeyName":{
+            "Type":"String",
+            "Description":"Name of an existing EC2 KeyPair to enable SSH access to the web server",
+            "Default":"deployment"
+        },
+        "InstanceType":{
+            "Description":"WebServer EC2 instance type",
+            "Type":"String",
+            "Default":"m1.small",
+            "AllowedValues":[
+                "t1.micro",
+                "m1.small",
+                "m1.medium",
+                "m1.large",
+                "m1.xlarge",
+                "m2.xlarge",
+                "m2.2xlarge",
+                "m2.4xlarge",
+                "m3.xlarge",
+                "m3.2xlarge",
+                "c1.medium",
+                "c1.xlarge",
+                "cc1.4xlarge",
+                "cc2.8xlarge",
+                "cg1.4xlarge"
+            ],
+            "ConstraintDescription":"must be a valid EC2 instance type."
+        },
+        "SSHLocation":{
+            "Description":"The IP address range that can be used to SSH to the EC2 instances",
+            "Type":"String",
+            "MinLength":"9",
+            "MaxLength":"18",
+            "Default":"0.0.0.0/0",
+            "AllowedPattern":"(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+            "ConstraintDescription":"must be a valid IP CIDR range of the form x.x.x.x/x."
+        },
+        "WebServerPort":{
+            "Description":"The TCP port for the Web Server",
+            "Type":"Number",
+            "Default":"80"
+        },
+        "CacheNodePort":{
+            "Description":"The TCP port for the nodes in the Elasticache cluster",
+            "Type":"Number",
+            "Default":"11211"
+        },
+        "RabbitMQPort":{
+            "Description":"The TCP port for the rabbitMQ node",
+            "Type":"Number",
+            "Default":"5672"
+        },
+        "BastionInstanceType":{
+            "Description":"Bastion Host EC2 instance type",
+            "Type":"String",
+            "Default":"m1.small",
+            "AllowedValues":[
+                "t1.micro",
+                "m1.small",
+                "m1.medium",
+                "m1.large",
+                "m1.xlarge",
+                "m2.xlarge",
+                "m2.2xlarge",
+                "m2.4xlarge",
+                "m3.xlarge",
+                "m3.2xlarge",
+                "c1.medium",
+                "c1.xlarge",
+                "cc1.4xlarge",
+                "cc2.8xlarge",
+                "cg1.4xlarge"
+            ],
+            "ConstraintDescription":"must be a valid EC2 instance type."
+        },
+        "NATInstanceType":{
+            "Description":"NET Device EC2 instance type",
+            "Type":"String",
+            "Default":"m1.small",
+            "AllowedValues":[
+                "t1.micro",
+                "m1.small",
+                "m1.medium",
+                "m1.large",
+                "m1.xlarge",
+                "m2.xlarge",
+                "m2.2xlarge",
+                "m2.4xlarge",
+                "m3.xlarge",
+                "m3.2xlarge",
+                "c1.medium",
+                "c1.xlarge",
+                "cc1.4xlarge",
+                "cc2.8xlarge",
+                "cg1.4xlarge"
+            ],
+            "ConstraintDescription":"must be a valid EC2 instance type."
+        },
+        "RabbitMQInstanceType":{
+            "Description":"RabbitMQ EC2 instance type",
+            "Type":"String",
+            "Default":"m1.small",
+            "AllowedValues":[
+                "t1.micro",
+                "m1.small",
+                "m1.medium",
+                "m1.large",
+                "m1.xlarge",
+                "m2.xlarge",
+                "m2.2xlarge",
+                "m2.4xlarge",
+                "m3.xlarge",
+                "m3.2xlarge",
+                "c1.medium",
+                "c1.xlarge",
+                "cc1.4xlarge",
+                "cc2.8xlarge",
+                "cg1.4xlarge"
+            ],
+            "ConstraintDescription":"must be a valid EC2 instance type."
+        },
+        "MlapiDesiredCapacity":{
+            "Description":"The Auto-scaling group desired capacity for the mlapi hosts",
+            "Type":"Number",
+            "Default":"2"
+        },
+        "RabbitMQDesiredCapacity":{
+            "Description":"The Auto-scaling group desired capacity for the RabbitMQ hosts",
+            "Type":"Number",
+            "Default":"1"
+        },
+        "CacheNodeType":{
+            "Default":"cache.m1.small",
+            "Description":"The compute and memory capacity of the nodes in the Cache Cluster",
+            "Type":"String",
+            "AllowedValues":[
+                "cache.t1.micro",
+                "cache.m1.small",
+                "cache.m1.medium",
+                "cache.m1.large",
+                "cache.m1.xlarge",
+                "cache.m2.xlarge",
+                "cache.m2.2xlarge",
+                "cache.m2.4xlarge",
+                "cache.c1.xlarge"
+            ],
+            "ConstraintDescription":"must select a valid Cache Node type."
+        },
+        "NumberOfCacheNodes":{
+            "Default":"2",
+            "Description":"The number of Cache Nodes the Cache Cluster should have",
+            "Type":"Number",
+            "MinValue":"1",
+            "MaxValue":"10",
+            "ConstraintDescription":"must be between 1 and 10."
+        },
+        "DBName":{
+            "Default":"wwc",
+            "Description":"The database name",
+            "Type":"String",
+            "MinLength":"1",
+            "MaxLength":"64",
+            "AllowedPattern":"[a-zA-Z][a-zA-Z0-9]*",
+            "ConstraintDescription":"must begin with a letter and contain only alphanumeric characters."
+        },
+        "DBUsername":{
+            "Default":"mlapi",
+            "NoEcho":"true",
+            "Description":"The database admin account username",
+            "Type":"String",
+            "MinLength":"1",
+            "MaxLength":"16",
+            "AllowedPattern":"[a-zA-Z][a-zA-Z0-9]*",
+            "ConstraintDescription":"must begin with a letter and contain only alphanumeric characters."
+        },
+        "DBPassword":{
+            "Default":"changeme",
+            "NoEcho":"true",
+            "Description":"The database admin account password",
+            "Type":"String",
+            "MinLength":"4",
+            "MaxLength":"41",
+            "ConstraintDescription":"must contain only alphanumeric characters. Minimum length 4."
+        },
+        "DBClass":{
+            "Default":"db.m1.small",
+            "Description":"Database instance class",
+            "Type":"String",
+            "AllowedValues":[
+                "db.m1.micro",
+                "db.m1.small",
+                "db.m1.medium",
+                "db.m1.large",
+                "db.m1.xlarge",
+                "db.m2.xlarge",
+                "db.m2.2xlarge",
+                "db.m2.4xlarge"
+            ],
+            "ConstraintDescription":"must select a valid database instance type."
+        },
+        "DBAllocatedStorage":{
+            "Default":"5",
+            "Description":"The size of the database (Gb)",
+            "Type":"Number",
+            "MinValue":"5",
+            "MaxValue":"3072",
+            "ConstraintDescription":"must be between 5 and 3072Gb."
+        }
+    },
+    "Mappings":{
+        "AWSInstanceType2Arch":{
+            "t1.micro":        { "Arch":"64" },
+            "m1.small":        { "Arch":"64" },
+            "m1.medium":       { "Arch":"64" },
+            "m1.large":        { "Arch":"64" },
+            "m1.xlarge":       { "Arch":"64" },
+            "m2.xlarge":       { "Arch":"64" },
+            "m2.2xlarge":      { "Arch":"64" },
+            "m2.4xlarge":      { "Arch":"64" },
+            "m3.xlarge":       { "Arch":"64" },
+            "m3.2xlarge":      { "Arch":"64" },
+            "c1.medium":       { "Arch":"64" },
+            "c1.xlarge":       { "Arch":"64" }
+        },
+        "AWSRegionArch2AMI":{
+            "us-east-1":       { "32":"ami-def89fb7", "64":"ami-d0f89fb9" },
+            "us-west-1":       { "32":"ami-fc002cb9", "64":"ami-fe002cbb" },
+            "us-west-2":       { "32":"ami-0ef96e3e", "64":"ami-70f96e40" },
+            "eu-west-1":       { "32":"ami-c27b6fb6", "64":"ami-ce7b6fba" },
+            "sa-east-1":       { "32":"ami-a1da00bc", "64":"ami-a3da00be" },
+            "ap-southeast-1":  { "32":"ami-66084734", "64":"ami-64084736" },
+            "ap-southeast-2":  { "32":"ami-06ea7a3c", "64":"ami-04ea7a3e" },
+            "ap-northeast-1":  { "32":"ami-fc6ceefd", "64":"ami-fe6ceeff" }
+        },
+        "AWSNATAMI":{
+            "us-east-1":       { "AMI":"ami-c6699baf" },
+            "us-west-2":       { "AMI":"ami-52ff7262" },
+            "us-west-1":       { "AMI":"ami-3bcc9e7e" },
+            "eu-west-1":       { "AMI":"ami-0b5b6c7f" },
+            "ap-southeast-1":  { "AMI":"ami-02eb9350" },
+            "ap-southeast-2":  { "AMI":"ami-ab990e91" },
+            "ap-northeast-1":  { "AMI":"ami-14d86d15" },
+            "sa-east-1":       { "AMI":"ami-0439e619" }
+        },
+        "SubnetConfig":{
+            "VPC":             { "CIDR":"10.0.0.0/16" },
+            "Public01":        { "CIDR":"10.0.0.0/24" },
+            "Public02":        { "CIDR":"10.0.1.0/24" },
+            "Mlapi01":        { "CIDR":"10.0.10.0/24" },
+            "Mlapi02":        { "CIDR":"10.0.11.0/24" },
+            "Rabbit01":        { "CIDR":"10.0.40.0/24" },
+            "Rabbit02":        { "CIDR":"10.0.41.0/24" },
+            "Data01":          { "CIDR":"10.0.50.0/24" },
+            "Data02":          { "CIDR":"10.0.51.0/24" },
+            "Cache01":         { "CIDR":"10.0.60.0/24" },
+            "Cache02":         { "CIDR":"10.0.61.0/24" }
+        },
+        "MapRegionsToAvailZones":{
+            "us-east-1":       { "AZone2":"us-east-1a",      "AZone0":"us-east-1b",      "AZone1":"us-east-1c" },
+            "us-west-1":       { "AZone0":"us-west-1a",      "AZone2":"us-west-1b",      "AZone1":"us-west-1c" },
+            "us-west-2":       { "AZone0":"us-west-2a",      "AZone1":"us-west-2b",      "AZone2":"us-west-2c" },
+            "eu-west-1":       { "AZone0":"eu-west-1a",      "AZone1":"eu-west-1b",      "AZone2":"eu-west-1c" },
+            "sa-east-1":       { "AZone0":"sa-east-1a",      "AZone1":"sa-east-1b",      "AZone2":"sa-east-1c" },
+            "ap-southeast-1":  { "AZone0":"ap-southeast-1a", "AZone1":"ap-southeast-1b", "AZone2":"ap-southeast-1c" },
+            "ap-southeast-2":  { "AZone0":"ap-southeast-2a", "AZone1":"ap-southeast-2b", "AZone2":"ap-southeast-2c" },
+            "ap-northeast-1":  { "AZone0":"ap-northeast-1a", "AZone1":"ap-northeast-1b", "AZone2":"ap-northeast-1c" }
+        }
+    },
+    "Resources":{
+        "MlapiVPC":{
+            "Type":"AWS::EC2::VPC",
+            "Properties":{
+                "CidrBlock":"10.0.0.0/16",
+                "InstanceTenancy":"default"
+            }
+        },
+        "PublicSubnet01":{
+            "Type":"AWS::EC2::Subnet",
+            "Properties":{
+                "VpcId":{
+                    "Ref":"MlapiVPC"
+                },
+                "CidrBlock":{
+                    "Fn::FindInMap":[
+                        "SubnetConfig",
+                        "Public01",
+                        "CIDR"
+                    ]
+                },
+                "AvailabilityZone":{
+                    "Fn::FindInMap":[
+                        "MapRegionsToAvailZones",
+                        { "Ref":"AWS::Region" },
+                        "AZone0"
+                    ]
+                }
+            }
+        },
+        "PublicSubnet02":{
+            "Type":"AWS::EC2::Subnet",
+            "Properties":{
+                "VpcId":{
+                    "Ref":"MlapiVPC"
+                },
+                "CidrBlock":{
+                    "Fn::FindInMap":[
+                        "SubnetConfig",
+                        "Public02",
+                        "CIDR"
+                    ]
+                },
+                "AvailabilityZone":{
+                    "Fn::FindInMap":[
+                        "MapRegionsToAvailZones",
+                        { "Ref":"AWS::Region" },
+                        "AZone1"
+                    ]
+                }
+            }
+        },
+        "MlapiSubnet01":{
+            "Type":"AWS::EC2::Subnet",
+            "Properties":{
+                "VpcId":{
+                    "Ref":"MlapiVPC"
+                },
+                "CidrBlock":{
+                    "Fn::FindInMap":[
+                        "SubnetConfig",
+                        "Mlapi01",
+                        "CIDR"
+                    ]
+                },
+                "AvailabilityZone":{
+                    "Fn::FindInMap":[
+                        "MapRegionsToAvailZones",
+                        { "Ref":"AWS::Region" },
+                        "AZone0"
+                    ]
+                },
+                "Tags":[
+                    {
+                        "Key":"Application",
+                        "Value":"mlapi"
+                    },
+                    {
+                        "Key":"Network",
+                        "Value":"Private"
+                    }
+                ]
+            }
+        },
+        "MlapiSubnet02":{
+            "Type":"AWS::EC2::Subnet",
+            "Properties":{
+                "VpcId":{
+                    "Ref":"MlapiVPC"
+                },
+                "CidrBlock":{
+                    "Fn::FindInMap":[
+                        "SubnetConfig",
+                        "Mlapi02",
+                        "CIDR"
+                    ]
+                },
+                "AvailabilityZone":{
+                    "Fn::FindInMap":[
+                        "MapRegionsToAvailZones",
+                        { "Ref":"AWS::Region" },
+                        "AZone1"
+                    ]
+                },
+                "Tags":[
+                    {
+                        "Key":"Application",
+                        "Value":"mlapi"
+                    },
+                    {
+                        "Key":"Network",
+                        "Value":"Private"
+                    }
+                ]
+            }
+        },
+        "RabbitSubnet01":{
+            "Type":"AWS::EC2::Subnet",
+            "Properties":{
+                "VpcId":{
+                    "Ref":"MlapiVPC"
+                },
+                "CidrBlock":{
+                    "Fn::FindInMap":[
+                        "SubnetConfig",
+                        "Rabbit01",
+                        "CIDR"
+                    ]
+                },
+                "AvailabilityZone":{
+                    "Fn::FindInMap":[
+                        "MapRegionsToAvailZones",
+                        { "Ref":"AWS::Region" },
+                        "AZone0"
+                    ]
+                },
+                "Tags":[
+                    {
+                        "Key":"Application",
+                        "Value":"RabbitMQ"
+                    },
+                    {
+                        "Key":"Network",
+                        "Value":"Private"
+                    }
+                ]
+            }
+        },
+        "RabbitSubnet02":{
+            "Type":"AWS::EC2::Subnet",
+            "Properties":{
+                "VpcId":{
+                    "Ref":"MlapiVPC"
+                },
+                "CidrBlock":{
+                    "Fn::FindInMap":[
+                        "SubnetConfig",
+                        "Rabbit02",
+                        "CIDR"
+                    ]
+                },
+                "AvailabilityZone":{
+                    "Fn::FindInMap":[
+                        "MapRegionsToAvailZones",
+                        { "Ref":"AWS::Region" },
+                        "AZone1"
+                    ]
+                },
+                "Tags":[
+                    {
+                        "Key":"Application",
+                        "Value":"RabbitMQ"
+                    },
+                    {
+                        "Key":"Network",
+                        "Value":"Private"
+                    }
+                ]
+            }
+        },
+        "Data01":{
+            "Type":"AWS::EC2::Subnet",
+            "Properties":{
+                "VpcId":{
+                    "Ref":"MlapiVPC"
+                },
+                "CidrBlock":{
+                    "Fn::FindInMap":[
+                        "SubnetConfig",
+                        "Data01",
+                        "CIDR"
+                    ]
+                },
+                "AvailabilityZone":{
+                    "Fn::FindInMap":[
+                        "MapRegionsToAvailZones",
+                        { "Ref":"AWS::Region" },
+                        "AZone0"
+                    ]
+                },
+                "Tags":[
+                    {
+                        "Key":"Application",
+                        "Value":"RDS"
+                    },
+                    {
+                        "Key":"Network",
+                        "Value":"Data"
+                    }
+                ]
+            }
+        },
+        "Data02":{
+            "Type":"AWS::EC2::Subnet",
+            "Properties":{
+                "VpcId":{
+                    "Ref":"MlapiVPC"
+                },
+                "CidrBlock":{
+                    "Fn::FindInMap":[
+                        "SubnetConfig",
+                        "Data02",
+                        "CIDR"
+                    ]
+                },
+                "AvailabilityZone":{
+                    "Fn::FindInMap":[
+                        "MapRegionsToAvailZones",
+                        { "Ref":"AWS::Region" },
+                        "AZone1"
+                    ]
+                },
+                "Tags":[
+                    {
+                        "Key":"Application",
+                        "Value":"RDS"
+                    },
+                    {
+                        "Key":"Network",
+                        "Value":"Data"
+                    }
+                ]
+            }
+        },
+        "Cache01":{
+            "Type":"AWS::EC2::Subnet",
+            "Properties":{
+                "VpcId":{
+                    "Ref":"MlapiVPC"
+                },
+                "CidrBlock":{
+                    "Fn::FindInMap":[
+                        "SubnetConfig",
+                        "Cache01",
+                        "CIDR"
+                    ]
+                },
+                "AvailabilityZone":{
+                    "Fn::FindInMap":[
+                        "MapRegionsToAvailZones",
+                        { "Ref":"AWS::Region" },
+                        "AZone0"
+                    ]
+                },
+                "Tags":[
+                    {
+                        "Key":"Application",
+                        "Value":"Elasticache"
+                    },
+                    {
+                        "Key":"Network",
+                        "Value":"Cache"
+                    }
+                ]
+            }
+        },
+        "Cache02":{
+            "Type":"AWS::EC2::Subnet",
+            "Properties":{
+                "VpcId":{
+                    "Ref":"MlapiVPC"
+                },
+                "CidrBlock":{
+                    "Fn::FindInMap":[
+                        "SubnetConfig",
+                        "Cache02",
+                        "CIDR"
+                    ]
+                },
+                "AvailabilityZone":{
+                    "Fn::FindInMap":[
+                        "MapRegionsToAvailZones",
+                        { "Ref":"AWS::Region" },
+                        "AZone1"
+                    ]
+                },
+                "Tags":[
+                    {
+                        "Key":"Application",
+                        "Value":"Elasticache"
+                    },
+                    {
+                        "Key":"Network",
+                        "Value":"Cache"
+                    }
+                ]
+            }
+        },
+        "InternetGateway":{
+            "Type":"AWS::EC2::InternetGateway",
+            "Properties":{
+                "Tags":[
+                    {
+                        "Key":"Application",
+                        "Value":{
+                            "Ref":"AWS::StackId"
+                        }
+                    },
+                    {
+                        "Key":"Network",
+                        "Value":"Public"
+                    }
+                ]
+            }
+        },
+        "GatewayToInternet":{
+            "Type":"AWS::EC2::VPCGatewayAttachment",
+            "Properties":{
+                "VpcId":{
+                    "Ref":"MlapiVPC"
+                },
+                "InternetGatewayId":{
+                    "Ref":"InternetGateway"
+                }
+            }
+        },
+        "PublicRouteTable":{
+            "Type":"AWS::EC2::RouteTable",
+            "Properties":{
+                "VpcId":{
+                    "Ref":"MlapiVPC"
+                },
+                "Tags":[
+                    {
+                        "Key":"Application",
+                        "Value":{
+                            "Ref":"AWS::StackId"
+                        }
+                    },
+                    {
+                        "Key":"Network",
+                        "Value":"Public"
+                    }
+                ]
+            }
+        },
+        "PublicRoute":{
+            "Type":"AWS::EC2::Route",
+            "Properties":{
+                "RouteTableId":{
+                    "Ref":"PublicRouteTable"
+                },
+                "DestinationCidrBlock":"0.0.0.0/0",
+                "GatewayId":{
+                    "Ref":"InternetGateway"
+                }
+            }
+        },
+        "PublicSubnetRouteTableAssociation01":{
+            "Type":"AWS::EC2::SubnetRouteTableAssociation",
+            "Properties":{
+                "SubnetId":{
+                    "Ref":"PublicSubnet01"
+                },
+                "RouteTableId":{
+                    "Ref":"PublicRouteTable"
+                }
+            }
+        },
+        "PublicSubnetRouteTableAssociation02":{
+            "Type":"AWS::EC2::SubnetRouteTableAssociation",
+            "Properties":{
+                "SubnetId":{
+                    "Ref":"PublicSubnet02"
+                },
+                "RouteTableId":{
+                    "Ref":"PublicRouteTable"
+                }
+            }
+        },
+        "PublicNetworkAcl":{
+            "Type":"AWS::EC2::NetworkAcl",
+            "Properties":{
+                "VpcId":{
+                    "Ref":"MlapiVPC"
+                },
+                "Tags":[
+                    {
+                        "Key":"Application",
+                        "Value":{
+                            "Ref":"AWS::StackId"
+                        }
+                    },
+                    {
+                        "Key":"Network",
+                        "Value":"Public"
+                    }
+                ]
+            }
+        },
+        "InboundHTTPPublicNetworkAclEntry":{
+            "Type":"AWS::EC2::NetworkAclEntry",
+            "Properties":{
+                "NetworkAclId":{
+                    "Ref":"PublicNetworkAcl"
+                },
+                "RuleNumber":"100",
+                "Protocol":"6",
+                "RuleAction":"allow",
+                "Egress":"false",
+                "CidrBlock":"0.0.0.0/0",
+                "PortRange":{
+                    "From":"80",
+                    "To":"80"
+                }
+            }
+        },
+        "InboundHTTPSPublicNetworkAclEntry":{
+            "Type":"AWS::EC2::NetworkAclEntry",
+            "Properties":{
+                "NetworkAclId":{
+                    "Ref":"PublicNetworkAcl"
+                },
+                "RuleNumber":"101",
+                "Protocol":"6",
+                "RuleAction":"allow",
+                "Egress":"false",
+                "CidrBlock":"0.0.0.0/0",
+                "PortRange":{
+                    "From":"443",
+                    "To":"443"
+                }
+            }
+        },
+        "InboundSSHPublicNetworkAclEntry":{
+            "Type":"AWS::EC2::NetworkAclEntry",
+            "Properties":{
+                "NetworkAclId":{
+                    "Ref":"PublicNetworkAcl"
+                },
+                "RuleNumber":"102",
+                "Protocol":"6",
+                "RuleAction":"allow",
+                "Egress":"false",
+                "CidrBlock":{
+                    "Ref":"SSHLocation"
+                },
+                "PortRange":{
+                    "From":"22",
+                    "To":"22"
+                }
+            }
+        },
+        "InboundEmphemeralPublicNetworkAclEntry":{
+            "Type":"AWS::EC2::NetworkAclEntry",
+            "Properties":{
+                "NetworkAclId":{
+                    "Ref":"PublicNetworkAcl"
+                },
+                "RuleNumber":"103",
+                "Protocol":"6",
+                "RuleAction":"allow",
+                "Egress":"false",
+                "CidrBlock":"0.0.0.0/0",
+                "PortRange":{
+                    "From":"1024",
+                    "To":"65535"
+                }
+            }
+        },
+        "OutboundPublicNetworkAclEntry":{
+            "Type":"AWS::EC2::NetworkAclEntry",
+            "Properties":{
+                "NetworkAclId":{
+                    "Ref":"PublicNetworkAcl"
+                },
+                "RuleNumber":"100",
+                "Protocol":"6",
+                "RuleAction":"allow",
+                "Egress":"true",
+                "CidrBlock":"0.0.0.0/0",
+                "PortRange":{
+                    "From":"0",
+                    "To":"65535"
+                }
+            }
+        },
+        "PublicSubnetNetworkAclAssociation01":{
+            "Type":"AWS::EC2::SubnetNetworkAclAssociation",
+            "Properties":{
+                "SubnetId":{
+                    "Ref":"PublicSubnet01"
+                },
+                "NetworkAclId":{
+                    "Ref":"PublicNetworkAcl"
+                }
+            }
+        },
+        "PublicSubnetNetworkAclAssociation02":{
+            "Type":"AWS::EC2::SubnetNetworkAclAssociation",
+            "Properties":{
+                "SubnetId":{
+                    "Ref":"PublicSubnet02"
+                },
+                "NetworkAclId":{
+                    "Ref":"PublicNetworkAcl"
+                }
+            }
+        },
+        "PrivateRouteTable":{
+            "Type":"AWS::EC2::RouteTable",
+            "Properties":{
+                "VpcId":{
+                    "Ref":"MlapiVPC"
+                },
+                "Tags":[
+                    {
+                        "Key":"Application",
+                        "Value":{
+                            "Ref":"AWS::StackId"
+                        }
+                    },
+                    {
+                        "Key":"Network",
+                        "Value":"Private"
+                    }
+                ]
+            }
+        },
+        "PrivateRoute":{
+            "Type":"AWS::EC2::Route",
+            "Properties":{
+                "RouteTableId":{
+                    "Ref":"PrivateRouteTable"
+                },
+                "DestinationCidrBlock":"0.0.0.0/0",
+                "InstanceId":{
+                    "Ref":"NATDevice"
+                }
+            }
+        },
+        "PrivateSubnetRouteTableAssociationMlapi01":{
+            "Type":"AWS::EC2::SubnetRouteTableAssociation",
+            "Properties":{
+                "SubnetId":{
+                    "Ref":"MlapiSubnet01"
+                },
+                "RouteTableId":{
+                    "Ref":"PrivateRouteTable"
+                }
+            }
+        },
+        "PrivateSubnetRouteTableAssociationMlapi02":{
+            "Type":"AWS::EC2::SubnetRouteTableAssociation",
+            "Properties":{
+                "SubnetId":{
+                    "Ref":"MlapiSubnet02"
+                },
+                "RouteTableId":{
+                    "Ref":"PrivateRouteTable"
+                }
+            }
+        },
+        "PrivateSubnetRouteTableAssociationRabbit01":{
+            "Type":"AWS::EC2::SubnetRouteTableAssociation",
+            "Properties":{
+                "SubnetId":{
+                    "Ref":"RabbitSubnet01"
+                },
+                "RouteTableId":{
+                    "Ref":"PrivateRouteTable"
+                }
+            }
+        },
+        "PrivateSubnetRouteTableAssociationRabbit02":{
+            "Type":"AWS::EC2::SubnetRouteTableAssociation",
+            "Properties":{
+                "SubnetId":{
+                    "Ref":"RabbitSubnet02"
+                },
+                "RouteTableId":{
+                    "Ref":"PrivateRouteTable"
+                }
+            }
+        },
+        "PrivateSubnetRouteTableAssociationData01":{
+            "Type":"AWS::EC2::SubnetRouteTableAssociation",
+            "Properties":{
+                "SubnetId":{
+                    "Ref":"Data01"
+                },
+                "RouteTableId":{
+                    "Ref":"PrivateRouteTable"
+                }
+            }
+        },
+        "PrivateSubnetRouteTableAssociationData02":{
+            "Type":"AWS::EC2::SubnetRouteTableAssociation",
+            "Properties":{
+                "SubnetId":{
+                    "Ref":"Data02"
+                },
+                "RouteTableId":{
+                    "Ref":"PrivateRouteTable"
+                }
+            }
+        },
+        "PrivateSubnetRouteTableAssociationCache01":{
+            "Type":"AWS::EC2::SubnetRouteTableAssociation",
+            "Properties":{
+                "SubnetId":{
+                    "Ref":"Cache01"
+                },
+                "RouteTableId":{
+                    "Ref":"PrivateRouteTable"
+                }
+            }
+        },
+        "PrivateSubnetRouteTableAssociationCache02":{
+            "Type":"AWS::EC2::SubnetRouteTableAssociation",
+            "Properties":{
+                "SubnetId":{
+                    "Ref":"Cache02"
+                },
+                "RouteTableId":{
+                    "Ref":"PrivateRouteTable"
+                }
+            }
+        },
+        "PrivateNetworkAcl":{
+            "Type":"AWS::EC2::NetworkAcl",
+            "Properties":{
+                "VpcId":{
+                    "Ref":"MlapiVPC"
+                },
+                "Tags":[
+                    {
+                        "Key":"Application",
+                        "Value":{
+                            "Ref":"AWS::StackId"
+                        }
+                    },
+                    {
+                        "Key":"Network",
+                        "Value":"Private"
+                    }
+                ]
+            }
+        },
+        "InboundPrivateNetworkAclEntry":{
+            "Type":"AWS::EC2::NetworkAclEntry",
+            "Properties":{
+                "NetworkAclId":{
+                    "Ref":"PrivateNetworkAcl"
+                },
+                "RuleNumber":"100",
+                "Protocol":"6",
+                "RuleAction":"allow",
+                "Egress":"false",
+                "CidrBlock":"0.0.0.0/0",
+                "PortRange":{
+                    "From":"0",
+                    "To":"65535"
+                }
+            }
+        },
+        "OutBoundPrivateNetworkAclEntry":{
+            "Type":"AWS::EC2::NetworkAclEntry",
+            "Properties":{
+                "NetworkAclId":{
+                    "Ref":"PrivateNetworkAcl"
+                },
+                "RuleNumber":"100",
+                "Protocol":"6",
+                "RuleAction":"allow",
+                "Egress":"true",
+                "CidrBlock":"0.0.0.0/0",
+                "PortRange":{
+                    "From":"0",
+                    "To":"65535"
+                }
+            }
+        },
+        "PrivateSubnetNetworkAclAssociationMlapi01":{
+            "Type":"AWS::EC2::SubnetNetworkAclAssociation",
+            "Properties":{
+                "SubnetId":{
+                    "Ref":"MlapiSubnet01"
+                },
+                "NetworkAclId":{
+                    "Ref":"PrivateNetworkAcl"
+                }
+            }
+        },
+        "PrivateSubnetNetworkAclAssociationMlapi02":{
+            "Type":"AWS::EC2::SubnetNetworkAclAssociation",
+            "Properties":{
+                "SubnetId":{
+                    "Ref":"MlapiSubnet02"
+                },
+                "NetworkAclId":{
+                    "Ref":"PrivateNetworkAcl"
+                }
+            }
+        },
+        "PrivateSubnetNetworkAclAssociationRabbit01":{
+            "Type":"AWS::EC2::SubnetNetworkAclAssociation",
+            "Properties":{
+                "SubnetId":{
+                    "Ref":"RabbitSubnet01"
+                },
+                "NetworkAclId":{
+                    "Ref":"PrivateNetworkAcl"
+                }
+            }
+        },
+        "PrivateSubnetNetworkAclAssociationRabbit02":{
+            "Type":"AWS::EC2::SubnetNetworkAclAssociation",
+            "Properties":{
+                "SubnetId":{
+                    "Ref":"RabbitSubnet02"
+                },
+                "NetworkAclId":{
+                    "Ref":"PrivateNetworkAcl"
+                }
+            }
+        },
+        "PrivateSubnetNetworkAclAssociationData01":{
+            "Type":"AWS::EC2::SubnetNetworkAclAssociation",
+            "Properties":{
+                "SubnetId":{
+                    "Ref":"Data01"
+                },
+                "NetworkAclId":{
+                    "Ref":"PrivateNetworkAcl"
+                }
+            }
+        },
+        "PrivateSubnetNetworkAclAssociationData02":{
+            "Type":"AWS::EC2::SubnetNetworkAclAssociation",
+            "Properties":{
+                "SubnetId":{
+                    "Ref":"Data02"
+                },
+                "NetworkAclId":{
+                    "Ref":"PrivateNetworkAcl"
+                }
+            }
+        },
+        "PrivateSubnetNetworkAclAssociationCache01":{
+            "Type":"AWS::EC2::SubnetNetworkAclAssociation",
+            "Properties":{
+                "SubnetId":{
+                    "Ref":"Cache01"
+                },
+                "NetworkAclId":{
+                    "Ref":"PrivateNetworkAcl"
+                }
+            }
+        },
+        "PrivateSubnetNetworkAclAssociationCache02":{
+            "Type":"AWS::EC2::SubnetNetworkAclAssociation",
+            "Properties":{
+                "SubnetId":{
+                    "Ref":"Cache02"
+                },
+                "NetworkAclId":{
+                    "Ref":"PrivateNetworkAcl"
+                }
+            }
+        },
+        "NATIPAddress":{
+            "Type":"AWS::EC2::EIP",
+            "Properties":{
+                "Domain":"vpc",
+                "InstanceId":{
+                    "Ref":"NATDevice"
+                }
+            }
+        },
+        "NATDevice":{
+            "Type":"AWS::EC2::Instance",
+            "Properties":{
+                "InstanceType":{
+                    "Ref":"NATInstanceType"
+                },
+                "KeyName":{
+                    "Ref":"KeyName"
+                },
+                "SubnetId":{
+                    "Ref":"PublicSubnet01"
+                },
+                "SourceDestCheck":"false",
+                "ImageId":{
+                    "Fn::FindInMap":[
+                        "AWSNATAMI",
+                        {
+                            "Ref":"AWS::Region"
+                        },
+                        "AMI"
+                    ]
+                },
+                "Tags":[
+                    {
+                        "Key":"group",
+                        "Value":"mlapi-nat",
+                        "PropagateAtLaunch":true
+                    },
+                    {
+                        "Key":"Group",
+                        "Value": {
+                            "Fn::Join" : [ "", [ "mlapi-nat_", {"Ref" : "EnvironmentTag"} ] ]
+                        },
+                        "PropagateAtLaunch":true
+                    },
+                    {
+                        "Key":"environment",
+                        "Value":{
+                            "Ref":"EnvironmentTag"
+                        },
+                        "PropagateAtLaunch":true
+                    }
+                ],
+                "SecurityGroupIds":[
+                    {
+                        "Ref":"NATSecurityGroup"
+                    }
+                ]
+            }
+        },
+        "NATSecurityGroup":{
+            "Type":"AWS::EC2::SecurityGroup",
+            "Properties":{
+                "GroupDescription":"Enable internal access to the NAT device",
+                "VpcId":{
+                    "Ref":"MlapiVPC"
+                },
+                "SecurityGroupIngress":[
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":"80",
+                        "ToPort":"80",
+                        "CidrIp":"0.0.0.0/0"
+                    },
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":"443",
+                        "ToPort":"443",
+                        "CidrIp":"0.0.0.0/0"
+                    },
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":"22",
+                        "ToPort":"22",
+                        "CidrIp":{
+                            "Ref":"SSHLocation"
+                        }
+                    }
+                ],
+                "SecurityGroupEgress":[
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":"80",
+                        "ToPort":"80",
+                        "CidrIp":"0.0.0.0/0"
+                    },
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":"443",
+                        "ToPort":"443",
+                        "CidrIp":"0.0.0.0/0"
+                    },
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":"22",
+                        "ToPort":"22",
+                        "CidrIp":{
+                            "Ref":"SSHLocation"
+                        }
+                    },
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":"9418",
+                        "ToPort":"9418",
+                        "CidrIp":"0.0.0.0/0"
+                    }
+                ]
+            }
+        },
+        "BastionIPAddress":{
+            "Type":"AWS::EC2::EIP",
+            "Properties":{
+                "Domain":"vpc",
+                "InstanceId":{
+                    "Ref":"BastionHost"
+                }
+            }
+        },
+        "BastionHost":{
+            "Type":"AWS::EC2::Instance",
+            "Properties":{
+                "InstanceType":{
+                    "Ref":"BastionInstanceType"
+                },
+                "KeyName":{
+                    "Ref":"KeyName"
+                },
+                "SubnetId":{
+                    "Ref":"PublicSubnet01"
+                },
+                "ImageId":{
+                    "Fn::FindInMap":[
+                        "AWSRegionArch2AMI",
+                        {
+                            "Ref":"AWS::Region"
+                        },
+                        {
+                            "Fn::FindInMap":[
+                                "AWSInstanceType2Arch",
+                                {
+                                    "Ref":"BastionInstanceType"
+                                },
+                                "Arch"
+                            ]
+                        }
+                    ]
+                },
+                "Tags":[
+                    {
+                        "Key":"group",
+                        "Value":"mlapi-bastion",
+                        "PropagateAtLaunch":true
+                    },
+                    {
+                        "Key":"Group",
+                        "Value": {
+                            "Fn::Join" : [ "", [ "mlapi-bastion_", {"Ref" : "EnvironmentTag"} ] ]
+                        },
+                        "PropagateAtLaunch":true
+                    },
+                    {
+                        "Key":"environment",
+                        "Value":{
+                            "Ref":"EnvironmentTag"
+                        },
+                        "PropagateAtLaunch":true
+                    }
+                ],
+                "SecurityGroupIds":[
+                    {
+                        "Ref":"BastionSecurityGroup"
+                    }
+                ]
+            }
+        },
+        "BastionSecurityGroup":{
+            "Type":"AWS::EC2::SecurityGroup",
+            "Properties":{
+                "GroupDescription":"Enable access to the Bastion host",
+                "VpcId":{
+                    "Ref":"MlapiVPC"
+                },
+                "SecurityGroupIngress":[
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":"22",
+                        "ToPort":"22",
+                        "CidrIp":{
+                            "Ref":"SSHLocation"
+                        }
+                    }
+                ],
+                "SecurityGroupEgress":[
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":"22",
+                        "ToPort":"22",
+                        "CidrIp":{
+                            "Fn::FindInMap":[
+                                "SubnetConfig",
+                                "Mlapi01",
+                                "CIDR"
+                            ]
+                        }
+                    },
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":"22",
+                        "ToPort":"22",
+                        "CidrIp":{
+                            "Fn::FindInMap":[
+                                "SubnetConfig",
+                                "Mlapi02",
+                                "CIDR"
+                            ]
+                        }
+                    },
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":"80",
+                        "ToPort":"80",
+                        "CidrIp":"0.0.0.0/0"
+                    },
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":"22",
+                        "ToPort":"22",
+                        "CidrIp":"0.0.0.0/0"
+                    },
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":"9418",
+                        "ToPort":"9418",
+                        "CidrIp":"0.0.0.0/0"
+                    },
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":"443",
+                        "ToPort":"443",
+                        "CidrIp":"0.0.0.0/0"
+                    }
+                ]
+            }
+        },
+				"MlapiRole": {
+						"Type": "AWS::IAM::Role",
+						"Properties": {
+								"AssumeRolePolicyDocument": {
+										"Statement": [ {
+												"Effect": "Allow",
+												"Principal": {
+														"Service": [ "ec2.amazonaws.com" ]
+												},
+												"Action": [ "sts:AssumeRole" ]
+										} ]
+								},
+								"Path": "/"
+						}
+				},
+				"MlapiInstanceProfile": {
+						"Type": "AWS::IAM::InstanceProfile",
+						"Properties": {
+								"Path": "/",
+								"Roles": [ {
+										"Ref": "MlapiRole"
+								} ]
+						}
+				},
+        "MlapiServerUser":{
+            "Type":"AWS::IAM::User",
+            "Properties":{
+                "Path":"/",
+                "Policies":[
+                    {
+                        "PolicyName":"root",
+                        "PolicyDocument":{
+                            "Statement":[
+                                {
+                                    "Effect":"Allow",
+                                    "Action":[
+                                        "cloudformation:DescribeStackResource",
+                                        "s3:Put"
+                                    ],
+                                    "Resource":"*"
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "HostKeys":{
+            "Type":"AWS::IAM::AccessKey",
+            "Properties":{
+                "UserName":{
+                    "Ref":"MlapiServerUser"
+                }
+            }
+        },
+        "AdminSecurityGroup":{
+            "Type":"AWS::EC2::SecurityGroup",
+            "Properties":{
+                "GroupDescription":"Admin Security Group",
+                "VpcId":{
+                    "Ref":"MlapiVPC"
+                },
+                "SecurityGroupIngress":[
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":"22",
+                        "ToPort":"22",
+                        "CidrIp":{
+                            "Ref":"SSHLocation"
+                        }
+                    }
+                ]
+            }
+        },
+        "MlapiServer":{
+            "Type":"AWS::AutoScaling::LaunchConfiguration",
+            "Metadata":{
+                "AWS::CloudFormation::Init":{
+                    "config":{
+                        "files":{
+                            "/home/ubuntu/.s3cfg":{
+                                "content":{
+                                    "Fn::Join":[
+                                        "",
+                                        [
+                                            "[default]\n",
+                                            "access_key = ",
+                                            {
+                                                "Ref":"HostKeys"
+                                            },
+                                            "\n",
+                                            "secret_key = ",
+                                            {
+                                                "Fn::GetAtt":[
+                                                    "HostKeys",
+                                                    "SecretAccessKey"
+                                                ]
+                                            },
+                                            "\n",
+                                            "use_https = True\n"
+                                        ]
+                                    ]
+                                },
+                                "mode":"000644",
+                                "owner":"ubuntu",
+                                "group":"ubuntu"
+                            }
+                        }
+                    }
+                }
+            },
+            "Properties":{
+								"IamInstanceProfile":{ "Ref":"MlapiInstanceProfile" },
+                "SecurityGroups":[
+                    {
+                        "Ref":"MlapiServerSecurityGroup"
+                    }
+                ],
+                "ImageId":{
+                    "Fn::FindInMap":[
+                        "AWSRegionArch2AMI",
+                        {
+                            "Ref":"AWS::Region"
+                        },
+                        {
+                            "Fn::FindInMap":[
+                                "AWSInstanceType2Arch",
+                                {
+                                    "Ref":"InstanceType"
+                                },
+                                "Arch"
+                            ]
+                        }
+                    ]
+                },
+                "UserData":{
+                    "Fn::Base64":{
+                        "Fn::Join":[
+                            "",
+                            [
+                                "#!/bin/bash\n",
+                                "exec >> /home/ubuntu/cflog.log\n",
+                                "exec 2>> /home/ubuntu/cflog.log\n",
+                                "function error_exit\n",
+                                "{\n",
+                                "  cfn-signal -e 1 -r \"$1\" '",
+                                {
+                                    "Ref":"MlapiServerWaitHandle"
+                                },
+                                "'\n",
+                                "  exit 1\n",
+                                "}\n",
+                                "for dev in /dev/xvdc /dev/xvdd; do sudo echo w | fdisk $dev; sudo mkfs -t ext4 $dev;done;\n",
+                                "sudo mkdir /mnt/logs\n",
+                                "sudo mount /dev/xvdc /mnt/logs\n",
+                                "sudo mount /dev/xvdd /opt\n",
+                                "apt-get -y update\n",
+                                "apt-get -y install python-setuptools\n",
+                                "echo \"Python Tools installed\" - `date` >> /home/ubuntu/cflog.txt\n",
+                                "easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz\n",
+                                "echo \"Cloudformation Boostrap installed \" - `date` >> /home/ubuntu/cflog.txt\n",
+                                "cfn-init --region ",
+                                {
+                                    "Ref":"AWS::Region"
+                                },
+                                "    -s ",
+                                {
+                                    "Ref":"AWS::StackName"
+                                },
+                                " -r MlapiServer ",
+                                "         --access-key ",
+                                {
+                                    "Ref":"HostKeys"
+                                },
+                                "         --secret-key ",
+                                {
+                                    "Fn::GetAtt":[
+                                        "HostKeys",
+                                        "SecretAccessKey"
+                                    ]
+                                },
+                                " || error_exit 'Failed to run cfn-init'\n",
+                                "echo \"cfn-init run \" - `date` >> /home/ubuntu/cflog.txt\n",
+                                "# If all went well, signal success\n",
+                                "cfn-signal -e $? -r 'Mlapi Server configuration' '",
+                                {
+                                    "Ref":"MlapiServerWaitHandle"
+                                },
+                                "'\n"
+                            ]
+                        ]
+                    }
+                },
+                "KeyName":{
+                    "Ref":"KeyName"
+                },
+                "InstanceType":{
+                    "Ref":"InstanceType"
+                },
+                "BlockDeviceMappings":[
+                    {
+                        "DeviceName" : "/dev/sda1",
+                        "Ebs" : { "VolumeSize" : "50" }
+                    },
+                    {
+                        "DeviceName":"/dev/xvdc",
+                        "Ebs":{
+                            "VolumeSize":"50"
+                        }
+                    },
+                    {
+                        "DeviceName":"/dev/xvdd",
+                        "Ebs":{
+                            "VolumeSize":"50"
+                        }
+                    }
+                ]
+            }
+        },
+        "MlapiServerASGroup":{
+            "Type":"AWS::AutoScaling::AutoScalingGroup",
+            "Properties":{
+                "AvailabilityZones":[
+                    {
+                        "Fn::GetAtt":[
+                            "MlapiSubnet01",
+                            "AvailabilityZone"
+                        ]
+                    },
+                    {
+                        "Fn::GetAtt":[
+                            "MlapiSubnet02",
+                            "AvailabilityZone"
+                        ]
+                    }
+                ],
+                "VPCZoneIdentifier":[
+                    {
+                        "Ref":"MlapiSubnet01"
+                    },
+                    {
+                        "Ref":"MlapiSubnet02"
+                    }
+                ],
+                "Tags":[
+                    {
+                        "Key":"group",
+                        "Value":"mlapi",
+                        "PropagateAtLaunch":true
+                    },
+                    {
+                        "Key":"Group",
+                        "Value": {
+                            "Fn::Join" : [ "", [ "mlapi_", {"Ref" : "EnvironmentTag"} ] ]
+                        },
+                        "PropagateAtLaunch":true
+                    },
+                    {
+                        "Key":"environment",
+                        "Value":{
+                            "Ref":"EnvironmentTag"
+                        },
+                        "PropagateAtLaunch":true
+                    }
+                ],
+                "LaunchConfigurationName":{
+                    "Ref":"MlapiServer"
+                },
+                "MinSize":"1",
+                "MaxSize":"2",
+                "DesiredCapacity":{
+                    "Ref":"MlapiDesiredCapacity"
+                },
+                "LoadBalancerNames":[
+                    {
+                        "Ref":"MlapiELB"
+                    }
+                ]
+            }
+        },
+        "MlapiServerScaleUpPolicy":{
+            "Type":"AWS::AutoScaling::ScalingPolicy",
+            "Properties":{
+                "AdjustmentType":"ChangeInCapacity",
+                "AutoScalingGroupName":{
+                    "Ref":"MlapiServerASGroup"
+                },
+                "Cooldown":"60",
+                "ScalingAdjustment":"1"
+            }
+        },
+        "MlapiServerScaleDownPolicy":{
+            "Type":"AWS::AutoScaling::ScalingPolicy",
+            "Properties":{
+                "AdjustmentType":"ChangeInCapacity",
+                "AutoScalingGroupName":{
+                    "Ref":"MlapiServerASGroup"
+                },
+                "Cooldown":"60",
+                "ScalingAdjustment":"-1"
+            }
+        },
+        "MlapiELB":{
+            "Type":"AWS::ElasticLoadBalancing::LoadBalancer",
+            "Properties":{
+                "SecurityGroups":[
+                    {
+                        "Ref":"MlapiELBSecurityGroup"
+                    }
+                ],
+                "Listeners":[
+                    {
+                        "LoadBalancerPort":"80",
+                        "InstancePort":{
+                            "Ref":"WebServerPort"
+                        },
+                        "Protocol":"HTTP"
+                    }
+                ],
+                "HealthCheck":{
+                    "Target":"HTTP:80/status/",
+                    "HealthyThreshold":"3",
+                    "UnhealthyThreshold":"5",
+                    "Interval":"30",
+                    "Timeout":"5"
+                },
+                "Subnets":[
+                    {
+                        "Ref":"PublicSubnet01"
+                    },
+                    {
+                        "Ref":"PublicSubnet02"
+                    }
+                ]
+            }
+        },
+        "MlapiELBSecurityGroup":{
+            "Type":"AWS::EC2::SecurityGroup",
+            "Properties":{
+                "GroupDescription":"Enable HTTP access on port 80",
+                "VpcId":{
+                    "Ref":"MlapiVPC"
+                },
+                "SecurityGroupIngress":[
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":"80",
+                        "ToPort":"80",
+                        "CidrIp":"0.0.0.0/0"
+                    },
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":"443",
+                        "ToPort":"443",
+                        "CidrIp":"0.0.0.0/0"
+                    }
+                ],
+                "SecurityGroupEgress":[
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":"80",
+                        "ToPort":"80",
+                        "CidrIp":"0.0.0.0/0"
+                    },
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":"443",
+                        "ToPort":"443",
+                        "CidrIp":"0.0.0.0/0"
+                    },
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":"22",
+                        "ToPort":"22",
+                        "CidrIp":"0.0.0.0/0"
+                    },
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":"8888",
+                        "ToPort":"8888",
+                        "CidrIp":"0.0.0.0/0"
+                    }
+                ]
+            }
+        },
+        "MlapiServerSecurityGroup":{
+            "Type":"AWS::EC2::SecurityGroup",
+            "Properties":{
+                "GroupDescription":"Open up SSH access plus Mlapi Server required ports",
+                "VpcId":{
+                    "Ref":"MlapiVPC"
+                },
+                "SecurityGroupIngress":[
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":"22",
+                        "ToPort":"22",
+                        "CidrIp":{
+                            "Ref":"SSHLocation"
+                        }
+                    },
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":"80",
+                        "ToPort":"80",
+                        "CidrIp":"0.0.0.0/0"
+                    },
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":"443",
+                        "ToPort":"443",
+                        "CidrIp":"0.0.0.0/0"
+                    },
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":"8888",
+                        "ToPort":"8888",
+                        "CidrIp":"0.0.0.0/0"
+                    }
+                ],
+                "SecurityGroupEgress":[
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":"80",
+                        "ToPort":"80",
+                        "CidrIp":"0.0.0.0/0"
+                    },
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":"443",
+                        "ToPort":"443",
+                        "CidrIp":"0.0.0.0/0"
+                    },
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":"22",
+                        "ToPort":"22",
+                        "CidrIp":"0.0.0.0/0"
+                    },
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":"3306",
+                        "ToPort":"3306",
+                        "CidrIp":"0.0.0.0/0"
+                    },
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":{ "Ref":"CacheNodePort" },
+                        "ToPort":{ "Ref":"CacheNodePort" },
+                        "CidrIp":"0.0.0.0/0"
+                    },
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":{ "Ref":"RabbitMQPort" },
+                        "ToPort":{ "Ref":"RabbitMQPort" },
+                        "CidrIp":"0.0.0.0/0"
+                    },
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":"6163",
+                        "ToPort":"6163",
+                        "CidrIp":"0.0.0.0/0"
+                    }
+                ]
+                }
+        },
+        "MlapiServerWaitHandle":{
+            "Type":"AWS::CloudFormation::WaitConditionHandle"
+        },
+        "MlapiServerWaitCondition":{
+            "Type":"AWS::CloudFormation::WaitCondition",
+            "DependsOn":"MlapiServer",
+            "Properties":{
+                "Handle":{
+                    "Ref":"MlapiServerWaitHandle"
+                },
+                "Timeout":"1200"
+            }
+        },
+        "RabbitMQServer":{
+            "Type":"AWS::AutoScaling::LaunchConfiguration",
+            "Metadata":{
+                "AWS::CloudFormation::Init":{
+                    "config":{
+                        "files":{
+                            "/home/ubuntu/.s3cfg":{
+                                "content":{
+                                    "Fn::Join":[
+                                        "",
+                                        [
+                                            "[default]\n",
+                                            "access_key = ",
+                                            {
+                                                "Ref":"HostKeys"
+                                            },
+                                            "\n",
+                                            "secret_key = ",
+                                            {
+                                                "Fn::GetAtt":[
+                                                    "HostKeys",
+                                                    "SecretAccessKey"
+                                                ]
+                                            },
+                                            "\n",
+                                            "use_https = True\n"
+                                        ]
+                                    ]
+                                },
+                                "mode":"000644",
+                                "owner":"ubuntu",
+                                "group":"ubuntu"
+                            }
+                        }
+                    }
+                }
+            },
+            "Properties":{
+                "SecurityGroups":[
+                    {
+                        "Ref":"RabbitMQServerSecurityGroup"
+                    }
+                ],
+                "ImageId":{
+                    "Fn::FindInMap":[
+                        "AWSRegionArch2AMI",
+                        {
+                            "Ref":"AWS::Region"
+                        },
+                        {
+                            "Fn::FindInMap":[
+                                "AWSInstanceType2Arch",
+                                {
+                                    "Ref":"RabbitMQInstanceType"
+                                },
+                                "Arch"
+                            ]
+                        }
+                    ]
+                },
+                "UserData":{
+                    "Fn::Base64":{
+                        "Fn::Join":[
+                            "",
+                            [
+                                "#!/bin/bash\n",
+                                "exec >> /home/ubuntu/cflog.log\n",
+                                "exec 2>> /home/ubuntu/cflog.log\n",
+                                "function error_exit\n",
+                                "{\n",
+                                "  cfn-signal -e 1 -r \"$1\" '",
+                                {
+                                    "Ref":"RabbitMQServerWaitHandle"
+                                },
+                                "'\n",
+                                "  exit 1\n",
+                                "}\n",
+                                "apt-get -y update\n",
+                                "apt-get -y install python-setuptools\n",
+                                "echo \"Python Tools installed\" - `date` >> /home/ubuntu/cflog.txt\n",
+                                "easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz\n",
+                                "echo \"Cloudformation Boostrap installed \" - `date` >> /home/ubuntu/cflog.txt\n",
+                                "cfn-init --region ",
+                                {
+                                    "Ref":"AWS::Region"
+                                },
+                                "    -s ",
+                                {
+                                    "Ref":"AWS::StackName"
+                                },
+                                " -r RabbitMQServer ",
+                                "         --access-key ",
+                                {
+                                    "Ref":"HostKeys"
+                                },
+                                "         --secret-key ",
+                                {
+                                    "Fn::GetAtt":[
+                                        "HostKeys",
+                                        "SecretAccessKey"
+                                    ]
+                                },
+                                " || error_exit 'Failed to run cfn-init'\n",
+                                "echo \"cfn-init run \" - `date` >> /home/ubuntu/cflog.txt\n",
+                                "# If all went well, signal success\n",
+                                "cfn-signal -e $? -r 'Mlapi Server configuration' '",
+                                {
+                                    "Ref":"RabbitMQServerWaitHandle"
+                                },
+                                "'\n"
+                            ]
+                        ]
+                    }
+                },
+                "KeyName":{
+                    "Ref":"KeyName"
+                },
+                "InstanceType":{
+                    "Ref":"RabbitMQInstanceType"
+                },
+                "BlockDeviceMappings":[
+                    {
+                        "DeviceName" : "/dev/sda1",
+                        "Ebs" : { "VolumeSize" : "50" }
+                    },
+                    {
+                        "DeviceName":"/dev/xvdc",
+                        "Ebs":{
+                            "VolumeSize":"50"
+                        }
+                    },
+                    {
+                        "DeviceName":"/dev/xvdd",
+                        "Ebs":{
+                            "VolumeSize":"50"
+                        }
+                    }
+                ]
+            }
+        },
+        "RabbitMQServerASGroup":{
+            "Type":"AWS::AutoScaling::AutoScalingGroup",
+            "Properties":{
+                "AvailabilityZones":[
+                    {
+                        "Fn::GetAtt":[
+                            "RabbitSubnet01",
+                            "AvailabilityZone"
+                        ]
+                    },
+                    {
+                        "Fn::GetAtt":[
+                            "RabbitSubnet02",
+                            "AvailabilityZone"
+                        ]
+                    }
+                ],
+                "VPCZoneIdentifier":[
+                    {
+                        "Ref":"RabbitSubnet01"
+                    },
+                    {
+                        "Ref":"RabbitSubnet02"
+                    }
+                ],
+                "Tags":[
+                    {
+                        "Key":"group",
+                        "Value":"mlapi-rabbitmq",
+                        "PropagateAtLaunch":true
+                    },
+                    {
+                        "Key":"Group",
+                        "Value": {
+                            "Fn::Join" : [ "", [ "mlapi-rabbitmq_", {"Ref" : "EnvironmentTag"} ] ]
+                        },
+                        "PropagateAtLaunch":true
+                    },
+                    {
+                        "Key":"environment",
+                        "Value":{
+                            "Ref":"EnvironmentTag"
+                        },
+                        "PropagateAtLaunch":true
+                    }
+                ],
+                "LaunchConfigurationName":{
+                    "Ref":"RabbitMQServer"
+                },
+                "MinSize":"1",
+                "MaxSize":"2",
+                "DesiredCapacity":{
+                    "Ref":"RabbitMQDesiredCapacity"
+                },
+                "LoadBalancerNames":[
+                    {
+                        "Ref":"RabbitMQELB"
+                    }
+                ]
+            }
+        },
+        "RabbitMQScaleUpPolicy":{
+            "Type":"AWS::AutoScaling::ScalingPolicy",
+            "Properties":{
+                "AdjustmentType":"ChangeInCapacity",
+                "AutoScalingGroupName":{
+                    "Ref":"RabbitMQServerASGroup"
+                },
+                "Cooldown":"60",
+                "ScalingAdjustment":"1"
+            }
+        },
+        "RabbitMQScaleDownPolicy":{
+            "Type":"AWS::AutoScaling::ScalingPolicy",
+            "Properties":{
+                "AdjustmentType":"ChangeInCapacity",
+                "AutoScalingGroupName":{
+                    "Ref":"RabbitMQServerASGroup"
+                },
+                "Cooldown":"60",
+                "ScalingAdjustment":"-1"
+            }
+        },
+        "RabbitMQELB":{
+            "Type":"AWS::ElasticLoadBalancing::LoadBalancer",
+            "Properties":{
+                "Scheme":"internal",
+                "SecurityGroups":[
+                    {
+                        "Ref":"RabbitMQELBSecurityGroup"
+                    }
+                ],
+                "Listeners":[
+                    {
+                        "LoadBalancerPort":{ "Ref":"RabbitMQPort" },
+                        "InstancePort":{ "Ref":"RabbitMQPort" },
+                        "Protocol":"TCP"
+                    },
+                    {
+                        "LoadBalancerPort":"6163",
+                        "InstancePort":"6163",
+                        "Protocol":"TCP"
+                    }
+                ],
+                "HealthCheck":{
+                    "Target":"TCP:22",
+                    "HealthyThreshold":"3",
+                    "UnhealthyThreshold":"5",
+                    "Interval":"30",
+                    "Timeout":"5"
+                },
+                "Subnets":[
+                    {
+                        "Ref":"RabbitSubnet01"
+                    },
+                    {
+                        "Ref":"RabbitSubnet02"
+                    }
+                ]
+            }
+        },
+        "RabbitMQELBSecurityGroup":{
+            "Type":"AWS::EC2::SecurityGroup",
+            "Properties":{
+                "GroupDescription":"Enable TCP access on rabbit ports",
+                "VpcId":{
+                    "Ref":"MlapiVPC"
+                },
+                "SecurityGroupIngress":[
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":{ "Ref":"RabbitMQPort" },
+                        "ToPort":{ "Ref":"RabbitMQPort" },
+                        "CidrIp":"10.0.0.0/16"
+                    },
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":"6163",
+                        "ToPort":"6163",
+                        "CidrIp":"10.0.0.0/16"
+                    }
+                ],
+                "SecurityGroupEgress":[
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":{ "Ref":"RabbitMQPort" },
+                        "ToPort":{ "Ref":"RabbitMQPort" },
+                        "CidrIp":"10.0.0.0/16"
+                    },
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":"6163",
+                        "ToPort":"6163",
+                        "CidrIp":"10.0.0.0/16"
+                    },
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":"22",
+                        "ToPort":"22",
+                        "CidrIp":"10.0.0.0/16"
+                    }
+                ]
+            }
+        },
+        "RabbitMQServerSecurityGroup":{
+            "Type":"AWS::EC2::SecurityGroup",
+            "Properties":{
+                "GroupDescription":"Open up SSH access plus Mlapi Server required ports",
+                "VpcId":{
+                    "Ref":"MlapiVPC"
+                },
+                "SecurityGroupIngress":[
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":"22",
+                        "ToPort":"22",
+                        "CidrIp":"10.0.0.0/16"
+                    },
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":{ "Ref":"RabbitMQPort" },
+                        "ToPort":{ "Ref":"RabbitMQPort" },
+                        "SourceSecurityGroupId" : {
+                            "Ref" : "RabbitMQELBSecurityGroup"
+                        }
+                    },
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":"6163",
+                        "ToPort":"6163",
+                        "SourceSecurityGroupId" : {
+                            "Ref" : "RabbitMQELBSecurityGroup"
+                        }
+                    },
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":"4369",
+                        "ToPort":"4369",
+                        "CidrIp":"0.0.0.0/0"
+                    }
+                ],
+                "SecurityGroupEgress":[
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":"4369",
+                        "ToPort":"4369",
+                        "CidrIp":"0.0.0.0/0"
+                    },
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":"80",
+                        "ToPort":"80",
+                        "CidrIp":"0.0.0.0/0"
+                    },
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":"9418",
+                        "ToPort":"9418",
+                        "CidrIp":"0.0.0.0/0"
+                    },
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":"443",
+                        "ToPort":"443",
+                        "CidrIp":"0.0.0.0/0"
+                    }
+                ]
+            }
+        },
+        "RabbitMQServerWaitHandle":{
+            "Type":"AWS::CloudFormation::WaitConditionHandle"
+        },
+        "RabbitMQServerWaitCondition":{
+            "Type":"AWS::CloudFormation::WaitCondition",
+            "DependsOn":"RabbitMQServer",
+            "Properties":{
+                "Handle":{
+                    "Ref":"RabbitMQServerWaitHandle"
+                },
+                "Timeout":"1200"
+            }
+        },
+        "MlapiDataSecurityGroup":{
+            "Type":"AWS::EC2::SecurityGroup",
+            "Properties":{
+                "GroupDescription":"Open up access to the data subnet",
+                "VpcId":{
+                    "Ref":"MlapiVPC"
+                },
+                "SecurityGroupIngress":[
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":"3306",
+                        "ToPort":"3306",
+                        "CidrIp":"0.0.0.0/0"
+                    }
+                ]
+            }
+        },
+        "MlapiDBSubnetGroup":{
+            "Type":"AWS::RDS::DBSubnetGroup",
+            "Properties":{
+                "DBSubnetGroupDescription":"Subnets available for the RDS DB Instance",
+                "SubnetIds":[
+                    {
+                        "Ref":"Data01"
+                    },
+                    {
+                        "Ref":"Data02"
+                    }
+                ]
+            }
+        },
+        "DBSecurityGroup":{
+            "Type":"AWS::RDS::DBSecurityGroup",
+            "Properties":{
+                "EC2VpcId":{
+                    "Ref":"MlapiVPC"
+                },
+                "DBSecurityGroupIngress":[
+                    {
+                        "EC2SecurityGroupId":{
+                            "Ref":"MlapiServerSecurityGroup"
+                        }
+                    }
+                ],
+                "GroupDescription":"Data access"
+            }
+        },
+        "MlapiBucket" : {
+            "Type" : "AWS::S3::Bucket",
+            "Properties" : {
+            "AccessControl" : "PublicRead"
+            }
+        },
+        "MlapiDB":{
+            "Type":"AWS::RDS::DBInstance",
+            "Properties":{
+                "DBName":{
+                    "Ref":"DBName"
+                },
+                "AllocatedStorage":{
+                    "Ref":"DBAllocatedStorage"
+                },
+                "DBInstanceClass":{
+                    "Ref":"DBClass"
+                },
+                "Engine":"MySQL",
+                "EngineVersion":"5.5",
+                "MasterUsername":{
+                    "Ref":"DBUsername"
+                },
+                "MasterUserPassword":{
+                    "Ref":"DBPassword"
+                },
+                "DBSubnetGroupName":{
+                    "Ref":"MlapiDBSubnetGroup"
+                },
+                "DBSecurityGroups":[
+                    {
+                        "Ref":"DBSecurityGroup"
+                    }
+                ],
+                "MultiAZ":"true"
+            }
+        },
+        "CacheSecurityGroup":{
+            "Type":"AWS::EC2::SecurityGroup",
+            "Properties":{
+                "GroupDescription":"Access to the elastic cache cluster",
+                "VpcId":{
+                    "Ref":"MlapiVPC"
+                },
+                "SecurityGroupIngress":[
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":{ "Ref":"CacheNodePort" },
+                        "ToPort":{ "Ref":"CacheNodePort" },
+                        "SourceSecurityGroupId":{
+                            "Ref":"MlapiServerSecurityGroup"
+                        }
+                    },
+                    {
+                        "IpProtocol":"tcp",
+                        "FromPort":"11211",
+                        "ToPort":"11211",
+                        "CidrIp":"0.0.0.0/0"
+                    }
+                ]
+            }
+        }
+    },
+    "Outputs":{
+        "RabbitMQCelery":{
+            "Description":"Celery string for rabbit",
+            "Value" :  {
+                "Fn::Join" :
+                    [
+                        "", [ "amqp://guest:guest@", { "Fn::GetAtt" : [ "RabbitMQELB", "DNSName" ]}, ":", { "Ref":"RabbitMQPort" },"/"]
+                    ]
+            }
+        },
+        "MlapiS3Bucket":{
+            "Description":"S3 Bucket for Mlapi servers",
+            "Value":{
+                "Ref":"MlapiBucket"
+            }
+        },
+        "BastionHostIPAddress": {
+            "Description":"Bastion public ip",
+            "Value":{
+                "Ref" : "BastionIPAddress"
+            }
+        },
+        "MlapiURL" : {
+            "Description" : "Mlapi ELB url",
+            "Value" :  { "Fn::Join" : [ "", [ "http://", { "Fn::GetAtt" : [ "MlapiELB", "DNSName" ]}]]}
+        },
+        "DatabaseConfigurationString":{
+            "Description":"JDBC connection string for database",
+            "Value":{
+                "Fn::Join":[
+                    "",
+                    [
+                        "'DATABASES': {\n",
+                        "    'default': {\n",
+                        "        'ENGINE': 'django.db.backends.mysql',\n",
+                        "        'NAME': '",
+                        {
+                            "Ref":"DBName"
+                        },
+                        "',\n",
+                        "        'USER': '",
+                        {
+                            "Ref":"DBUsername"
+                        },
+                        "',\n",
+                        "        'PASSWORD': '",
+                        {
+                            "Ref":"DBPassword"
+                        },
+                        "',\n",
+                        "        'HOST': '",
+                        {
+                            "Fn::GetAtt":[
+                                "MlapiDB",
+                                "Endpoint.Address"
+                            ]
+                        },
+                        "',\n",
+                        "        'PORT': '",
+                        {
+                            "Fn::GetAtt":[
+                                "MlapiDB",
+                                "Endpoint.Port"
+                            ]
+                        },
+                        "'\n",
+                        "    }\n",
+                        "}\n"
+                    ]
+                ]
+            }
+        },
+        "ElasticCacheCreateSubnetGroupCommand":{
+            "Description":"Commands to be run to create the elastic cache.  Creation isn't fully supported in CF today.",
+            "Value":{
+                "Fn::Join":[
+                    "",
+                    [
+                        "elasticache-create-cache-subnet-group",
+                        " ",
+                        {
+                            "Ref":"MlapiVPC"
+                        },
+                        "-ElasticCacheSubnetGroup --description  'VPC ElasticCache Subnet Group'",
+                        " --subnet-ID-list",
+                        " ",
+                        {
+                            "Ref":"Cache01"
+                        },
+                        ",",
+                        {
+                            "Ref":"Cache02"
+                        },
+                        " ",
+                        "--region=",
+                        {
+                            "Ref":"AWS::Region"
+                        }
+                    ]
+                ]
+            }
+        },
+        "ElasticCacheCreateCacheClusterCommand":{
+            "Description":"Create elasticcache cluster.  Run after creating the cache subnets!",
+            "Value":{
+                "Fn::Join":[
+                    "",
+                    [
+                        "elasticache-create-cache-cluster",
+                        " ",
+                        {
+                            "Ref":"MlapiVPC"
+                        },
+                        "-Cache --num-cache-nodes ",
+                        {
+                            "Ref":"NumberOfCacheNodes"
+                        },
+                        " --cache-node-type ",
+                        {
+                            "Ref":"CacheNodeType"
+                        },
+                        " --engine memcached --engine-version 1.4.5 --port ",
+                        {
+                            "Ref":"CacheNodePort"
+                        },
+                        " --preferred-availability-zone ",
+                        {
+                            "Fn::FindInMap":[
+                                "MapRegionsToAvailZones",
+                                { "Ref":"AWS::Region" },
+                                "AZone0"
+                            ]
+                        },
+                        " --cache-parameter-group-name default.memcached1.4 --auto-minor-version-upgrade true",
+                        " --cache-subnet-group-name ",
+                        {
+                            "Ref":"MlapiVPC"
+                        },
+                        "-ElasticCacheSubnetGroup ",
+                        "--region=",
+                        {
+                            "Ref":"AWS::Region"
+                        },
+                        " ",
+                        "--security-group-ids ",
+                        {
+                            "Ref": "CacheSecurityGroup"
+                        }
+                    ]
+                ]
+            }
+        },
+        "ElasticCacheDescribeNodeCommand":{
+            "Description":"Gets the cache nodes you just created",
+            "Value":{
+                "Fn::Join":[
+                    "",
+                    [
+                        "elasticache-describe-cache-clusters",
+                        " ",
+                        {
+                            "Ref":"MlapiVPC"
+                        },
+                        "-Cache --show-cache-node-info",
+                        " ",
+                        "--region=",
+                        {
+                            "Ref":"AWS::Region"
+                        }
+                    ]
+                ]
+            }
+        },
+        "EnableDNSHostnamesForVPCCommand":{
+            "Description":"MANUAL COMMAND #3: Change VPC setting to enable automatic DNS hostname resolution from within the VPC. Setting not supported in Cloudformation yet.",
+            "Value":{
+                "Fn::Join":[
+                    "",
+                    [
+                        "ec2-modify-vpc-attribute ",
+                        "-c ", { "Ref":"MlapiVPC" }, " ",
+                        "-d true"
+                    ]
+                ]
+            }
+        }
+    }
+}

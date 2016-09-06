@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        {% load compressed %}
+        {% compressed_css 'bootstrap' %}
+        {% compressed_css 'util_css' %}
+        {% compressed_js 'util' %}
+        {% block additional_js %}
+        {% endblock %}
+        <title>Problem Grader</title>
+        <meta name="csrf-token" content="{{csrf_token}}">
+    </head>
+    <body>
+    <div id="navbar" class="navbar navbar-fixed-top">
+        <div class="navbar-inner">
+            <div class="container">
+                {% block nav %}
+                    <ul class="nav">
+                        <li class=""><a href="/grader/" class="brand">edX Problem Grader</a></li>
+                        {% if user.is_authenticated %}
+                            <li class="dropdown">
+                                <a href="#" class="dropdown-toggle" data-toggle="dropdown" id="model-select-dropdown">
+                                    Actions
+                                    <b class="caret"></b>
+                                </a>
+                                <ul class="dropdown-menu">
+                                    <li class="model_select"><a href="/grader/course">Show Courses</a></li>
+                                    <li class="model_select"><a href="/grader/write_essays">Write Essays</a></li>
+                                    <li class="model_select"><a href="/grader/grade_essays">Grade Essays</a></li>
+                                </ul>
+                            </li>
+                            <li class="dropdown">
+                                <a href="#" class="dropdown-toggle" data-toggle="dropdown">
+                                    <i class="icon-user"></i>
+                                    {{ user.username }}
+                                    <b class="caret"></b>
+                                </a>
+                                <ul class="dropdown-menu">
+                                    <li class=""><a href="/grader/logout">Logout</a></li>
+                                </ul>
+                            </li>
+                        {% else %}
+                            <li class=""><a href="/grader/login">Login</a></li>
+                            <li class=""><a href="/grader/register">Register</a></li>
+                        {% endif %}
+                    </ul>
+                {% endblock %}
+            </div>
+        </div>
+    </div>
+    <header class="subhead">
+        <div class="container">
+            {% block header %}
+            {% endblock %}
+        </div>
+    </header>
+    <div class="container">
+        {% block content %}
+        {% endblock %}
+    </div>
+
+    </body>
+</html>

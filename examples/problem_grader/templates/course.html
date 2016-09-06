@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% load compressed %}
+
+{% block additional_js %}
+    {% compressed_js 'course' %}
+{% endblock %}
+
+{% block content %}
+    <h4>Courses</h4>
+    <div id="model_name" model={{ model }} url= {{ api_url }}></div>
+    <div id="model_add"></div>
+    <div id="model_container"></div>
+
+    {%  verbatim %}
+        <script type="text/template" id="course-item-template">
+            <div class="accordion-group">
+                <div class="accordion-heading">
+                    <a class="accordion-toggle collapsed" data-toggle="collapse" data-parent="#accordion2" href="#<%= href %>" data-elem_id="<%= id %>">
+                        <%= name %> <i class=" icon-remove delete-course pull-right"></i>
+                    </a>
+                </div>
+                <div id="<%= href %>" class="accordion-body collapse" style="height: 0px;">
+                    <div class="accordion-inner">
+                        <ul class="unstyled">
+                            <li>Number of students: <%= user_count %></li>
+                            <li>Number of problems: <%= problem_count %></li>
+                            <li>Created on: <%= created %></li>
+                            <li>Last modified on: <%= modified %></li>
+                        </ul>
+                        <button class="btn show-problems">Show Problems</button>
+                    </div>
+                </div>
+            </div>
+        </script>
+        <script type="text/template" id="course-list-template">
+            <div class="accordion" id="accordion2">
+                <% _.each( courses, function( course ){ %>
+                    <%= course %>
+                <% }); %>
+            </div>
+        </script>
+        <script type="text/template" id="course-add-template">
+            <div class="accordion-group">
+                <div class="accordion-heading">
+                    <a class="accordion-toggle collapsed" data-toggle="collapse" data-parent="#accordion2" href="#<%= href %>">
+                        <%= name %>
+                    </a>
+                </div>
+                <div id="<%= href %>" class="accordion-body collapse" style="height: 0px;">
+                    <div class="accordion-inner">
+                        <form class="form-horizontal" onsubmit="return false;">
+                            <div class="control-group">
+                                <label class="control-label" for="inputName">Course Name</label>
+                                <div class="controls">
+                                    <input type="text" id="inputName" placeholder="Course Name">
+                                </div>
+                            </div>
+                            <div class="control-group">
+                                <div class="controls">
+                                    <button type="submit" id="create-course" class="btn">Create Course</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </script>
+    {% endverbatim %}
+{% endblock %}

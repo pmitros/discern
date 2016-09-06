@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% load compressed %}
+
+{% block additional_js %}
+    {% compressed_js 'essay' %}
+{% endblock %}
+
+{% block content %}
+    <h4>Write Essays</h4>
+    <div id="model_name" model={{ model }} url= {{ api_url }}></div>
+    <div class="container-fluid">
+        <div class="row-fluid">
+                <div id="course_nav" class="span2 pull-left"></div>
+                <div id="problem_nav" class="span2"></div>
+                <div id="essay-container" class="span8"></div>
+        </div>
+    </div>
+
+    {%  verbatim %}
+        <script type="text/template" id="course-nav-template">
+            <ul class="nav nav-list">
+                <li class="nav-header">Course</li>
+                <% _.each( courses, function( course ){ %>
+                    <li data-course_id="<%= course.id %>"><a href="#" class="course-select"><%= course.course_name %></a></li>
+                <% }); %>
+            </ul>
+        </script>
+        <script type="text/template" id="problem-nav-template">
+            <ul class="nav nav-list">
+                <li class="nav-header">Problem</li>
+                <% _.each( problems, function( problem ){ %>
+                <li data-prompt="<%= problem.prompt %>" data-problem_id="<%= problem.id %>" data-course_id="<%= course_id %>" data-name="<%= problem.name %>"><a href="#" class="problem-select"><%= problem.name %></a></li>
+                <% }); %>
+            </ul>
+        </script>
+        <script type="text/template" id="essay-template">
+            <h4>Essay Response</h4>
+            <p>For problem <%= name %></p>
+            <h5>Prompt</h5>
+            <p><%= prompt %></p>
+            <form class="essay-template form-horizontal" data-problem_id="<%= problem_id %>" onsubmit="return false;">
+                <fieldset>
+                    <label><h5>Response</h5></label>
+                    <textarea id="essay-text" rows="10" type="text" placeholder="Enter response here"></textarea>
+                    <button type="submit" class="btn" id="essay-save">Save Response</button>
+                </fieldset>
+            </form>
+        </script>
+        {%  endverbatim %}
+{% endblock %}

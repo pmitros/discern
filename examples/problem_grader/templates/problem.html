@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% load compressed %}
+
+{% block additional_js %}
+    {% compressed_js 'problem' %}
+{% endblock %}
+{% block content %}
+    {% if course_name %}
+        <h4>Problems for {{ course_name }}</h4>
+    {% else %}
+        <h4>Problems</h4>
+    {% endif %}
+    <div id="model_name" model={{ model }} url={{ api_url }} data-course_id ={{ matching_course_id }} data-match_course={{ match_course }}></div>
+    <div id="model_add"></div>
+    <div id="model_container"></div>
+
+    {%  verbatim %}
+    <script type="text/template" id="problem-item-template">
+        <div class="accordion-group">
+            <div class="accordion-heading">
+                <a class="accordion-toggle collapsed" data-toggle="collapse" data-parent="#accordion2" href="#<%= href %>" data-elem_id="<%= id %>">
+                    <%= name %> <i class=" icon-remove delete-problem pull-right"></i>
+                </a>
+            </div>
+            <div id="<%= href %>" class="accordion-body collapse" style="height: 0px;">
+                <div class="accordion-inner">
+                    <ul class="unstyled">
+                        <li>Used in <%= course_count %> courses.</li>
+                        <li>Contains <%= essay_count %> essays.</li>
+                        <li>Created on: <%= created %></li>
+                        <li>Last modified on: <%= modified %></li>
+                    </ul>
+                    <h5>Prompt</h5>
+                    <p><%= prompt %></p>
+
+                    <h5>Rubric</h5>
+                    <%= rubric %>
+                </div>
+            </div>
+        </div>
+    </script>
+    <script type="text/template" id="problem-list-template">
+        <div class="accordion" id="accordion2">
+            <% _.each( problems, function( problem ){ %>
+            <%= problem %>
+            <% }); %>
+        </div>
+    </script>
+    <script type="text/template" id="problem-add-template">
+        <div class="accordion-group">
+            <div class="accordion-heading">
+                <a class="accordion-toggle collapsed" data-toggle="collapse" data-parent="#accordion2" href="#<%= href %>">
+                    <%= name %>
+                </a>
+            </div>
+            <div id="<%= href %>" class="accordion-body collapse" style="height: 0px;">
+                <div class="accordion-inner">
+                    <form class="form-horizontal" onsubmit="return false;">
+                        <div class="control-group">
+                            <label class="control-label" for="problem-name-input">Problem Name</label>
+                            <div class="controls">
+                                <input type="text" id="problem-name-input" placeholder="Problem Name">
+                            </div>
+                        </div>
+                        <div class="control-group">
+                            <label class="control-label" for="promptname">Prompt</label>
+                            <div class="controls">
+                                <textarea type="text" rows="3" id="promptname" placeholder="Enter prompt"></textarea>
+                            </div>
+                        </div>
+                        <div class="control-group rubric-input-container">
+                            <label class="control-label" for="rubricadd">Rubric</label>
+                            <div class="controls rubric-input">
+                                <div id="rubric-item-container">
+                                    <%= rubric %>
+                                </div>
+                                <button id="rubricadd" class="btn">Add</button>
+                            </div>
+                        </div>
+                        <div class="control-group">
+                            <div class="controls">
+                                <button type="submit" id="create-problem" class="btn">Create Problem</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </script>
+    <script type="text/template" id="rubric-item-template">
+        <div class="rubric-item" finished = "<%= finished %>">
+            <% if(finished) { %>
+                <textarea type="text" class="rubric-option-text rubric_input" placeholder="Rubric option text" disabled></textarea>
+                <select disabled class="rubric-score-select rubric_input">
+            <% } else { %>
+                <textarea type="text" class="rubric-option-text rubric_input" placeholder="Rubric option text"></textarea>
+                <select class="rubric-score-select rubric_input">
+            <% } %>
+                <option>1</option>
+                <option>2</option>
+                <option>3</option>
+                <option>4</option>
+                <option>5</option>
+            </select>
+        </div>
+    </script>
+    <script type="text/template" id="rubric-list-template">
+        <div id="rubric-list">
+            <table class="table table-condensed">
+            <tr>
+                <th>
+                    Rubric Text
+                </th>
+                <th>
+                    Points
+                </th>
+            </tr>
+            <% _.each( rubrics, function( rubric ){ %>
+                <tr>
+                    <td><%= rubric.option_text %></td>
+                    <td><%= rubric.option_points %></td>
+                </tr>
+                <% }); %>
+            </table>
+        </div>
+    </script>
+    {% endverbatim %}
+{% endblock %}

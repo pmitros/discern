@@ -1,0 +1,2 @@
+{{ object.feedback }}
+{{ object.annotated_text }}

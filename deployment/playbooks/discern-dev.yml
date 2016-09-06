@@ -1,0 +1,144 @@
+---
+
+- hosts: discern-dev
+  user: vagrant
+  sudo: True
+
+  vars:
+    # read-only ease repo
+    ease_source_repo: git://github.com/edx/ease.git
+    discern_dir: /home/vagrant/discern
+    ease_dir: /home/vagrant/ease
+    venv_dir: /home/vagrant/venv-discern
+    discern_settings: discern.settings
+    nltk_data_dir: /usr/share/nltk_data
+    remote_user: vagrant
+    discern_branch: dev
+    ease_branch: master
+    nginx_listen_port: 80
+    gunicorn_port: 7999
+    discern_user: vagrant
+    site_name: discern%
+
+  tasks:
+    - name: update apt
+      action: command /usr/bin/apt-get update
+
+    - name: install git
+      action: apt pkg=git state=present
+
+    #Install system packages
+    - name: install discern and ease apt packages
+      command: xargs -a {{item}}/apt-packages.txt apt-get install -y
+      with_items:
+        - ${discern_dir}
+
+    #Needed if using redis to prevent memory issues
+    - name: change memory commit settings -- needed for redis
+      command: sysctl vm.overcommit_memory=1
+
+    #Create the templates for upstart services
+    - name: render celery service from template
+      template: src=templates/celery.conf.j2 dest=/etc/init/celery.conf owner=root group=vagrant mode=0664
+      notify: restart celery
+
+    - name: render discern service from template
+      template: src=templates/discern.conf.j2 dest=/etc/init/discern.conf owner=root group=vagrant mode=0664
+      notify: restart discern
+
+    #Create directories for repos
+    - name: create ease directories and set permissions
+      file: path={{item}} owner={{discern_user}} group=vagrant mode=2775 state=directory
+      with_items:
+       - ${ease_dir}
+
+    #Upload custom git ssh script
+    - name: upload ssh script
+      copy: src=files/git_ssh.sh dest=/tmp/git_ssh.sh force=yes owner=root group=vagrant mode=750
+
+    - name: git checkout ease repo into ease_dir
+      git: dest={{ease_dir}} repo={{ease_source_repo}} version={{ease_branch}}
+      environment:
+        GIT_SSH: /tmp/git_ssh.sh
+      notify:
+        - restart celery
+        - restart discern
+
+    - name: create virtualenv
+      command: virtualenv {{venv_dir}}
+
+    #Install system packages
+    - name: install ease apt packages
+      command: xargs -a {{item}}/apt-packages.txt apt-get install -y
+      with_items:
+        - ${ease_dir}
+
+    #virtualenv uses an older version of distribute, so we need to install a newer one
+    - name: install newer version of distribute
+      command: ${venv_dir}/bin/easy_install -U distribute
+
+    #Numpy has to be a pre-requirement in order for scipy to build
+    - name: install python pre-requirements for discern and ease
+      pip: requirements="{{item}}/pre-requirements.txt" virtualenv="{{venv_dir}}" state=present
+      with_items:
+        - ${discern_dir}
+        - ${ease_dir}
+
+    - name : install python requirements for discern and ease
+      pip: requirements="{{item}}/requirements.txt" virtualenv="{{venv_dir}}" state=present
+      with_items:
+        - ${discern_dir}
+        - ${ease_dir}
+
+    - name: set permissions on venv_dir for vagrant user
+      file: path={{venv_dir}} owner=vagrant group=vagrant mode=2775 state=directory
+
+    - name: install ease python package
+      shell: ${venv_dir}/bin/activate; cd {{ease_dir}}; python setup.py install
+
+    #Needed for the ease package to work
+    - name: install nltk data using rendered shell script
+      shell: ${venv_dir}/bin/python -m nltk.downloader -d {{nltk_data_dir}} maxent_treebank_pos_tagger wordnet
+
+    - name: set permissions on nltk data directory
+      file: path={{nltk_data_dir}} owner={{discern_user}} mode=2775 state=directory
+
+    #Run this instead of using the ansible module because the ansible module only support syncdb of these three, and does not
+    #support virtualenvs as of this comment
+    - name: django syncdb, migrate, and collectstatic for discern
+      shell: ${venv_dir}/bin/python {{discern_dir}}/manage.py {{item}} --noinput --settings={{discern_settings}} --pythonpath={{discern_dir}}
+      with_items:
+        - syncdb
+        - migrate
+        - collectstatic
+
+    #Have this separate from the other three because it doesn't take the noinput flag
+    - name: django update_index for discern
+      shell: ${venv_dir}/bin/python {{discern_dir}}/manage.py update_index --settings={{discern_settings}} --pythonpath={{discern_dir}}
+
+    - name: create nginx directory and set perms
+      file: path=/etc/nginx/sites-available owner=root mode=2775 state=directory
+
+    #Install nginx sites available
+    #remove default link, render template, link template to sites-enabled to activate
+    - name: Removing default nginx config
+      file: path=/etc/nginx/sites-enabled/default state=absent
+      notify: restart nginx
+
+    - name: render nginx sites available
+      template: src=templates/nginx-discern.j2 dest=/etc/nginx/sites-available/{{ site_name }}
+      notify: restart nginx
+
+    - name: Creating nginx config link {{ site_name }}
+      file: src=/etc/nginx/sites-available/{{ site_name }} dest=/etc/nginx/sites-enabled/{{ site_name }} state=link owner=root group=root
+      notify: restart nginx
+
+  handlers:
+    - name: restart discern
+      service: name=discern state=restarted
+
+    - name: restart celery
+      service: name=celery state=restarted
+
+    - name: restart nginx
+      service: name=nginx state=restarted

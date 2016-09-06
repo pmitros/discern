@@ -1,0 +1,108 @@
+{% load analytical %}
+<!DOCTYPE html>
+<html>
+    <head>
+        {% analytical_head_top %}
+        {% analytical_head_bottom %}
+        {% load compressed %}
+        {% compressed_css 'bootstrap' %}
+        {% compressed_css 'util_css' %}
+        {% compressed_js 'util' %}
+        {% block additional_js %}
+        {% endblock %}
+        <title>ML API</title>
+        <meta name="csrf-token" content="{{csrf_token}}">
+    </head>
+    <body>
+    {% analytical_body_top %}
+    {% analytical_body_bottom %}
+    {%  verbatim %}
+        <script type="text/template" id="generic-item-add-template">
+            <div id="item-add">
+                <% for(key in item){ %>
+                    <%= key %>: <textarea rows="3" cols="100" type="text" id="<%= key %>" class="new-item"><%= item[key] %></textarea><br/>
+                <% }; %>
+                <a href="#" id="save-new-item" class="button">Save</a>
+            </div>
+        </script>
+        <script type="text/template" id="pagination-template">
+            <div id="page-nav">
+                <% if(pages > 1) { %>
+                    <% if(prev) { %>
+                        <span>previous</span>
+                        <!-- <a href="#" id="prev">previous</a> -->
+                    <% } else { %>
+                        <span>previous</span>
+                    <% } %>
+                    <%= range[0] %>..<%= range[1] %> of <%= total %>
+
+                    <% if(next) { %>
+                        <a href="#" id="next">next</a>
+                    <% } else { %>
+                        <span>next</span>
+                    <% } %>
+                <% } %>
+            </div>
+        </script>
+     {% endverbatim %}
+    <div id="navbar" class="navbar navbar-fixed-top">
+        <div class="navbar-inner">
+            <div class="container">
+                {% block nav %}
+                    <ul class="nav">
+                        <li class=""><a href="/frontend/" class="brand">edX ML API</a></li>
+                        {% if user.is_authenticated %}
+                            <li class="dropdown">
+                                <a href="#" class="dropdown-toggle" data-toggle="dropdown" id="model-select-dropdown">
+                                    Models
+                                    <b class="caret"></b>
+                                </a>
+                                <ul class="dropdown-menu">
+                                    <li class="model_select"><a href="/frontend/organization/">Organization</a></li>
+                                    <li class="model_select"><a href="/frontend/course/">Course</a></li>
+                                    <li class="model_select"><a href="/frontend/problem/">Problem</a></li>
+                                    <li class="model_select"><a href="/frontend/essay/">Essay</a></li>
+                                    <li class="model_select"><a href="/frontend/essaygrade/">Essay Grade</a></li>
+                                    <!-- <li class="model_select"><a href="/frontend/user">User</a></li> Hide this until it becomes functional-->
+                                    <li class="model_select"><a href="/frontend/userprofile/">User Profile</a></li>
+                                    <li class="model_select"><a href="/frontend/membership/">Membership</a></li>
+                                </ul>
+                            </li>
+                            <li class="dropdown">
+                                <a href="#" class="dropdown-toggle" data-toggle="dropdown">
+                                    <i class="icon-user"></i>
+                                    {{ user.username }}
+                                    <b class="caret"></b>
+                                </a>
+                                <ul class="dropdown-menu">
+                                    <li class=""><a href="/accounts/password/change/">Change password</a></li>
+                                    <li class=""><a href="/accounts/logout/">Logout</a></li>
+                                </ul>
+                            </li>
+                            {% if user.is_superuser %}
+                                <li class=""><a href="/admin/">Admin Site</a></li>
+                            {% endif %}
+                        {% else %}
+                            <li class=""><a href="/accounts/login/">Login</a></li>
+                            <li class=""><a href="/accounts/signup/">Register</a></li>
+                            <li class=""><a href="/accounts/password/reset/">Forgot Password</a></li>
+                        {% endif %}
+                        <li class=""><a href="http://discern.readthedocs.org/en/latest/" target="_blank">Documentation</a></li>
+                    </ul>
+                {% endblock %}
+            </div>
+        </div>
+    </div>
+    <header class="subhead">
+        <div class="container">
+            {% block header %}
+            {% endblock %}
+        </div>
+    </header>
+    <div class="container">
+        {% block content %}
+        {% endblock %}
+    </div>
+
+    </body>
+</html>
